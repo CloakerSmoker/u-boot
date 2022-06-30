@@ -22,6 +22,7 @@
 #endif
 
 #include <usb.h>
+#include <usb/kdb.h>
 
 /*
  * If overwrite_console returns 1, the stdin, stderr and stdout
@@ -182,8 +183,8 @@ static int usb_kbd_translate(struct usb_kbd_pdata *data, unsigned char scancode,
 	}
 
 	/* Alphanumeric values */
-	if ((scancode > 3) && (scancode <= 0x1d)) {
-		keycode = scancode - 4 + 'a';
+	if ((scancode >= USB_KEY_A) && (scancode <= USB_KEY_Z)) {
+		keycode = scancode - USB_KEY_A + 'a';
 
 		if (data->flags & USB_KBD_CAPSLOCK)
 			keycode &= ~CAPITAL_MASK;
@@ -197,20 +198,20 @@ static int usb_kbd_translate(struct usb_kbd_pdata *data, unsigned char scancode,
 		}
 	}
 
-	if ((scancode > 0x1d) && (scancode < 0x39)) {
+	if ((scancode >= USB_KEY_1) && (scancode <= USB_KEY_SLASH)) {
 		/* Shift pressed */
 		if (modifier & (LEFT_SHIFT | RIGHT_SHIFT))
-			keycode = usb_kbd_numkey_shifted[scancode - 0x1e];
+			keycode = usb_kbd_numkey_shifted[scancode - USB_KEY_1];
 		else
-			keycode = usb_kbd_numkey[scancode - 0x1e];
+			keycode = usb_kbd_numkey[scancode - USB_KEY_1];
 	}
 
 	/* Numeric keypad */
-	if ((scancode >= 0x54) && (scancode <= 0x67))
-		keycode = usb_kbd_num_keypad[scancode - 0x54];
+	if ((scancode >= USB_KEY_KPSLASH) && (scancode <= USB_KEY_KPEQUAL))
+		keycode = usb_kbd_num_keypad[scancode - USB_KEY_KPSLASH];
 
 	if (data->flags & USB_KBD_CTRL)
-		keycode = scancode - 0x3;
+		keycode = scancode - USB_KEY_A + 1;
 
 	if (pressed == 1) {
 		if (scancode == NUM_LOCK) {
@@ -236,47 +237,48 @@ static int usb_kbd_translate(struct usb_kbd_pdata *data, unsigned char scancode,
 	}
 
 #ifdef CONFIG_USB_KEYBOARD_FN_KEYS
-	if (scancode < 0x3a || scancode > 0x52 ||
-	    scancode == 0x46 || scancode == 0x47)
+	if (scancode < USB_KEY_F1 || scancode > USB_KEY_UPARROW ||
+	    scancode == USB_KEY_PRINTSCREEN || scancode == USB_KEY_SCROLL)
 		return 1;
 
 	usb_kbd_put_queue(data, 0x1b);
-	if (scancode < 0x3e) {
+	if (scancode <= USB_KEY_F4) {
 		/* F1 - F4 */
 		usb_kbd_put_queue(data, 0x4f);
-		usb_kbd_put_queue(data, scancode - 0x3a + 'P');
+		usb_kbd_put_queue(data, scancode - USB_KEY_F1 + 'P');
 		return 0;
 	}
 	usb_kbd_put_queue(data, '[');
-	if (scancode < 0x42) {
+	if (scancode <= USB_KEY_F8) {
 		/* F5 - F8 */
 		usb_kbd_put_queue(data, '1');
-		if (scancode == 0x3e)
+		if (scancode == USB_KEY_F5)
 			--scancode;
-		keycode = scancode - 0x3f + '7';
-	} else if (scancode < 0x49) {
+		keycode = scancode - USB_KEY_F6 + '7';
+	} else if (scancode <= USB_KEY_F12) {
 		/* F9 - F12 */
 		usb_kbd_put_queue(data, '2');
-		if (scancode > 0x43)
+		if (scancode > USB_KEY_F10)
 			++scancode;
-		keycode = scancode - 0x42 + '0';
+		keycode = scancode - USB_KEY_F9 + '0';
 	} else {
 		/*
 		 * INSERT, HOME, PAGE UP, DELETE, END, PAGE DOWN,
 		 * RIGHT, LEFT, DOWN, UP
 		 */
-		keycode = usb_special_keys[scancode - 0x49];
+		keycode = usb_special_keys[scancode - USB_KEY_INSERT];
 	}
 	usb_kbd_put_queue(data, keycode);
-	if (scancode < 0x4f && scancode != 0x4a && scancode != 0x4d)
+	if (scancode < USB_KEY_RIGHTARROW && scancode != USB_KEY_HOME 
+		&& scancode != USB_KEY_END)
 		usb_kbd_put_queue(data, '~');
 	return 0;
 #else
 	/* Left, Right, Up, Down */
-	if (scancode > 0x4e && scancode < 0x53) {
+	if (scancode >= USB_KEY_RIGHTARROW && scancode <= USB_KEY_UPARROW) {
 		usb_kbd_put_queue(data, 0x1b);
 		usb_kbd_put_queue(data, '[');
-		usb_kbd_put_queue(data, usb_special_keys[scancode - 0x4f]);
+		usb_kbd_put_queue(data, usb_special_keys[scancode - USB_KEY_RIGHTARROW]);
 		return 0;
 	}
 	return 1;
